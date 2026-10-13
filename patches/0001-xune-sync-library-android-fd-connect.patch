@@ -1,0 +1,62 @@
+diff --git a/include/xune_sync/xune_sync_api.h b/include/xune_sync/xune_sync_api.h
+index 019b3d3..ba4649a 100644
+--- a/include/xune_sync/xune_sync_api.h
++++ b/include/xune_sync/xune_sync_api.h
+@@ -164,6 +164,8 @@ XUNE_SYNC_API zune_device_handle_t zune_device_create();
+ XUNE_SYNC_API void zune_device_destroy(zune_device_handle_t handle);
+ 
+ XUNE_SYNC_API bool zune_device_connect_usb(zune_device_handle_t handle);
++// Android: connect using the fd from UsbDeviceConnection.getFileDescriptor()
++XUNE_SYNC_API bool zune_device_connect_usb_fd(zune_device_handle_t handle, int fd);
+ XUNE_SYNC_API void zune_device_disconnect(zune_device_handle_t handle);
+ 
+ // Connection validation - lightweight MTP operation to verify session is still valid
+diff --git a/lib/src/ZuneDevice.cpp b/lib/src/ZuneDevice.cpp
+index 64de441..fcd365c 100644
+--- a/lib/src/ZuneDevice.cpp
++++ b/lib/src/ZuneDevice.cpp
+@@ -117,10 +117,11 @@ ZuneDevice::~ZuneDevice() {
+     Disconnect();
+ }
+ 
+-bool ZuneDevice::ConnectUSB() {
++bool ZuneDevice::ConnectUSB(int android_fd) {
+     try {
+         Log("Connecting to Zune device via USB...");
+-        usb_context_ = std::make_shared<usb::Context>();
++        usb_context_ = android_fd >= 0 ? std::make_shared<usb::Context>(android_fd, 3)
++                                       : std::make_shared<usb::Context>();
+ 
+         // Find Zune device and store descriptor for later product ID lookup
+         auto devices = usb_context_->GetDevices();
+diff --git a/lib/src/ZuneDevice.h b/lib/src/ZuneDevice.h
+index 436cddc..f0d1699 100644
+--- a/lib/src/ZuneDevice.h
++++ b/lib/src/ZuneDevice.h
+@@ -50,7 +50,7 @@ public:
+     void SetMtpzDataPath(const std::string& path);
+ 
+     // --- Connection Management ---
+-    bool ConnectUSB();
++    bool ConnectUSB(int android_fd = -1);  // fd >= 0: Android UsbDeviceConnection fd
+     bool ConnectWireless(const std::string& ip_address);
+     void Disconnect();
+     bool IsConnected();
+diff --git a/lib/src/xune_sync_api.cpp b/lib/src/xune_sync_api.cpp
+index 4ad538e..1f8e76b 100644
+--- a/lib/src/xune_sync_api.cpp
++++ b/lib/src/xune_sync_api.cpp
+@@ -52,6 +52,13 @@ XUNE_SYNC_API bool zune_device_connect_usb(zune_device_handle_t handle) {
+     return false;
+ }
+ 
++XUNE_SYNC_API bool zune_device_connect_usb_fd(zune_device_handle_t handle, int fd) {
++    if (handle) {
++        return static_cast<ZuneDevice*>(handle)->ConnectUSB(fd);
++    }
++    return false;
++}
++
+ XUNE_SYNC_API void zune_device_disconnect(zune_device_handle_t handle) {
+     if (handle) {
+         static_cast<ZuneDevice*>(handle)->Disconnect();

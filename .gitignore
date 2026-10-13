@@ -1,0 +1,23 @@
+# build outputs and local state
+build/
+build-*/
+.gradle/
+local.properties
+*.apk
+!releases/*.apk
+*.so
+app/src/main/jniLibs/
+
+# third-party sources and toolchains fetched for the native build (see README)
+XuneSyncLibrary/
+deps/
+taglib-install/
+
+# never commit MTPZ credentials
+mtpz-data
+.mtpz-data
+mtpz_keys.h
+mtpz-download/
+
+# optional bundled key for private builds
+app/src/main/assets/mtpz-data

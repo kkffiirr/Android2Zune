@@ -1,0 +1,105 @@
+diff --git a/mtp/backend/libusb/usb/Context.cpp b/mtp/backend/libusb/usb/Context.cpp
+index 13a4a30..f321f89 100644
+--- a/mtp/backend/libusb/usb/Context.cpp
++++ b/mtp/backend/libusb/usb/Context.cpp
+@@ -39,6 +39,19 @@ namespace mtp { namespace usb
+ 		libusb_free_device_list(devs, 0);
+ 	}
+ 
++	Context::Context(int androidFd, int debugLevel)
++	{
++		// Android apps cannot enumerate /dev/bus/usb or open a netlink hotplug socket;
++		// NO_DEVICE_DISCOVERY makes libusb_init() skip both. (It is an enum, not a macro, so no #ifdef.)
++		libusb_init_option noDiscovery = {};
++		noDiscovery.option = LIBUSB_OPTION_NO_DEVICE_DISCOVERY;
++		USB_CALL(libusb_init_context(&_ctx, &noDiscovery, 1));
++		libusb_set_debug(_ctx, debugLevel);
++		libusb_device_handle *handle;
++		USB_CALL(libusb_wrap_sys_device(_ctx, (intptr_t)androidFd, &handle));
++		_devices.push_back(std::make_shared<DeviceDescriptor>(libusb_get_device(handle), handle));
++	}
++
+ 	Context::~Context()
+ 	{
+ 		_devices.clear();
+diff --git a/mtp/backend/libusb/usb/Context.h b/mtp/backend/libusb/usb/Context.h
+index 9732d1e..1727bcd 100644
+--- a/mtp/backend/libusb/usb/Context.h
++++ b/mtp/backend/libusb/usb/Context.h
+@@ -41,6 +41,8 @@ namespace mtp { namespace usb
+ 
+ 	public:
+ 		Context(int debugLevel = 3);
++		// Android: wrap an fd obtained from UsbDeviceConnection.getFileDescriptor()
++		explicit Context(int androidFd, int debugLevel);
+ 		~Context();
+ 
+ 		void Wait();
+diff --git a/mtp/backend/libusb/usb/DeviceDescriptor.cpp b/mtp/backend/libusb/usb/DeviceDescriptor.cpp
+index 21aeb48..1122b1f 100644
+--- a/mtp/backend/libusb/usb/DeviceDescriptor.cpp
++++ b/mtp/backend/libusb/usb/DeviceDescriptor.cpp
+@@ -27,6 +27,12 @@ namespace mtp { namespace usb
+ 		USB_CALL(libusb_get_device_descriptor(_dev, &_descriptor));
+ 	}
+ 
++	DeviceDescriptor::DeviceDescriptor(libusb_device *dev, libusb_device_handle *wrapped): _dev(dev), _wrapped(wrapped)
++	{
++		libusb_ref_device(_dev);
++		USB_CALL(libusb_get_device_descriptor(_dev, &_descriptor));
++	}
++
+ 	ConfigurationPtr DeviceDescriptor::GetConfiguration(int conf)
+ 	{
+ 		libusb_config_descriptor *desc;
+@@ -36,16 +42,17 @@ namespace mtp { namespace usb
+ 
+ 	DevicePtr DeviceDescriptor::Open(ContextPtr context)
+ 	{
+-		libusb_device_handle *handle;
+-		USB_CALL(libusb_open(_dev, &handle));
++		libusb_device_handle *handle = _wrapped;
++		if (!handle)
++			USB_CALL(libusb_open(_dev, &handle));
+ 		libusb_set_auto_detach_kernel_driver(handle, 1);
+ 		return std::make_shared<Device>(context, handle);
+ 	}
+ 
+ 	DevicePtr DeviceDescriptor::TryOpen(ContextPtr context)
+ 	{
+-		libusb_device_handle *handle;
+-		int r = libusb_open(_dev, &handle);
++		libusb_device_handle *handle = _wrapped;
++		int r = handle? 0: libusb_open(_dev, &handle);
+ 		if (r != 0)
+ 			return nullptr;
+ 		libusb_set_auto_detach_kernel_driver(handle, 1);
+diff --git a/mtp/backend/libusb/usb/DeviceDescriptor.h b/mtp/backend/libusb/usb/DeviceDescriptor.h
+index 3befb12..33e877f 100644
+--- a/mtp/backend/libusb/usb/DeviceDescriptor.h
++++ b/mtp/backend/libusb/usb/DeviceDescriptor.h
+@@ -53,9 +53,11 @@ namespace mtp { namespace usb
+ 	private:
+ 		libusb_device			*	_dev;
+ 		libusb_device_descriptor	_descriptor;
++		libusb_device_handle	*	_wrapped = nullptr; // Android pre-opened handle
+ 
+ 	public:
+ 		DeviceDescriptor(libusb_device *dev);
++		DeviceDescriptor(libusb_device *dev, libusb_device_handle *wrapped);
+ 		~DeviceDescriptor();
+ 
+ 		u16 GetVendorId() const
+diff --git a/mtp/backend/posix/Exception.cpp b/mtp/backend/posix/Exception.cpp
+index d9caed9..bf3a6a9 100644
+--- a/mtp/backend/posix/Exception.cpp
++++ b/mtp/backend/posix/Exception.cpp
+@@ -35,7 +35,7 @@ namespace mtp { namespace posix
+ 	std::string Exception::GetErrorMessage(int returnCode)
+ 	{
+ 		char buf[1024];
+-#if defined(_GNU_SOURCE) && defined(__GLIBC__)
++#if defined(_GNU_SOURCE) && (defined(__GLIBC__) || defined(__ANDROID__))
+ 		std::string text(strerror_r(returnCode, buf, sizeof(buf)));
+ #else
+ 		int r = strerror_r(returnCode, buf, sizeof(buf));
