@@ -32,7 +32,7 @@ Early test build. Honest summary of what has and has not been verified:
 
 ## Download
 
-The latest APK is in [`releases/`](releases/) (`ZTransfer-0.4-arm64.apk`, arm64 phones, Android 7+). It is a debug-signed
+The latest APK is in [`releases/`](releases/) (`ZTransfer-0.5-arm64.apk`, arm64 phones, Android 7+). It is a debug-signed
 test build: allow installs from your browser or file manager, and expect a "unknown developer" warning.
 
 ## MTPZ credentials (one-time setup)
@@ -111,8 +111,10 @@ A self-test that needs no Zune: `adb shell am start -n org.xune.ztransfer/.MainA
   **[TagLib](https://taglib.org)** (LGPL-2.1 / MPL-1.1).
 - The **[libmtp](https://libmtp.sourceforge.net)** project, whose MTPZ work and `.mtpz-data` format the whole
   ecosystem builds on.
-- Interface styling inspired by Microsoft's Zune desktop software. This project is not affiliated with or endorsed
-  by Microsoft. Zune is a trademark of Microsoft Corporation.
+- Interface styling inspired by Microsoft's Zune desktop software. The launcher icon uses the Zune logo
+  (`tools/zune.svg`, rendered by `tools/make_icon.py`, adapted from the icon script of the ScummVM-on-Zune project).
+  This project is not affiliated with or endorsed by Microsoft. Zune and the Zune logo are trademarks of
+  Microsoft Corporation.
 - Developed with the assistance of Claude Code (Anthropic).
 
 ## License
