@@ -1,4 +1,4 @@
-package org.xune.ztransfer
+package io.github.kkffiirr.zuneandroid
 
 import android.app.Activity
 import android.app.PendingIntent
@@ -34,7 +34,7 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
-private const val ACTION_PERM = "org.xune.ztransfer.USB_PERMISSION"
+private const val ACTION_PERM = "io.github.kkffiirr.zuneandroid.USB_PERMISSION"
 private const val ZUNE_VENDOR = 0x045E
 private const val REQ_KEYS = 1
 private const val REQ_FILES = 2

@@ -3,14 +3,14 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 android {
-    namespace = "org.xune.ztransfer"
+    namespace = "io.github.kkffiirr.zuneandroid"
     compileSdk = 34
     defaultConfig {
-        applicationId = "org.xune.ztransfer"
+        applicationId = "io.github.kkffiirr.zuneandroid"
         minSdk = 24
         targetSdk = 34
-        versionCode = 5
-        versionName = "0.5"
+        versionCode = 6
+        versionName = "0.6"
         // -PphoneOnly drops x86_64 (emulator-only) to shrink the APK
         ndk { abiFilters += if (project.hasProperty("phoneOnly")) listOf("arm64-v8a") else listOf("arm64-v8a", "x86_64") }
     }

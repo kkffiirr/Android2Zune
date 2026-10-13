@@ -40,19 +40,19 @@ add_library(aft-cli STATIC ${AFTL}/cli/Command.cpp ${AFTL}/cli/CommandLineStub.c
 target_include_directories(aft-cli PUBLIC ${AFTL} ${AFTL}/mtp ${AFTL}/cli ${AFTL}/mtp/backend/posix ${AFTL}/mtp/backend/libusb)
 target_link_libraries(aft-cli PUBLIC aftl)
 
-# ---- libxune_sync (curl stubbed, no TagLib) ----
+# ---- libzuneandroid: XuneSyncLibrary core + JNI (curl stubbed, no TagLib) ----
 file(GLOB_RECURSE XS_SRC ${XS}/lib/src/ZuneDevice.cpp ${XS}/lib/src/ZuneDeviceIdentification.cpp
   ${XS}/lib/src/NetworkManager.cpp ${XS}/lib/src/ZuneMtp*.cpp ${XS}/lib/src/ZMDBLibraryExtractor.cpp
   ${XS}/lib/src/zmdb/*.cpp ${XS}/lib/src/ptpip_client.cpp ${XS}/lib/src/ssdp_discovery.cpp
   ${XS}/lib/src/xune_sync_api.cpp ${XS}/lib/src/protocols/*.cpp)
-add_library(xune_sync SHARED ${XS_SRC})
-target_include_directories(xune_sync PRIVATE ${XS}/include ${XS}/lib/src ${CMAKE_CURRENT_SOURCE_DIR}/shim ${SSL}/crypto/include)
-target_link_libraries(xune_sync PRIVATE aft-cli aftl log)
-set_target_properties(xune_sync PROPERTIES CXX_VISIBILITY_PRESET hidden)
+add_library(zuneandroid SHARED ${XS_SRC})
+target_include_directories(zuneandroid PRIVATE ${XS}/include ${XS}/lib/src ${CMAKE_CURRENT_SOURCE_DIR}/shim ${SSL}/crypto/include)
+target_link_libraries(zuneandroid PRIVATE aft-cli aftl log)
+set_target_properties(zuneandroid PROPERTIES CXX_VISIBILITY_PRESET hidden)
 
 # ---- upload runner (reference sequence from tools/upload_test_cli.cpp) + JNI ----
 add_library(tag STATIC IMPORTED)
 set_target_properties(tag PROPERTIES IMPORTED_LOCATION ${ROOT}/taglib-install/${ANDROID_ABI}/lib/libtag.a)
-target_sources(xune_sync PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/upload_runner.cpp ${CMAKE_CURRENT_SOURCE_DIR}/jni_bridge.cpp)
-target_include_directories(xune_sync PRIVATE ${ROOT}/taglib-install/${ANDROID_ABI}/include ${XS})
-target_link_libraries(xune_sync PRIVATE tag z ssl_crypto)
+target_sources(zuneandroid PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/upload_runner.cpp ${CMAKE_CURRENT_SOURCE_DIR}/jni_bridge.cpp)
+target_include_directories(zuneandroid PRIVATE ${ROOT}/taglib-install/${ANDROID_ABI}/include ${XS})
+target_link_libraries(zuneandroid PRIVATE tag z ssl_crypto)

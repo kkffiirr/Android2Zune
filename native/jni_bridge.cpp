@@ -17,7 +17,7 @@ struct LineBuf : std::streambuf {
     }
     void flushLine() {
         if (line.empty()) return;
-        __android_log_print(ANDROID_LOG_INFO, "xune", "%s", line.c_str());
+        __android_log_print(ANDROID_LOG_INFO, "ZuneAndroid", "%s", line.c_str());
         jstring s = env->NewStringUTF(line.c_str());   // ponytail: assumes valid UTF-8 from the library
         env->CallVoidMethod(cb, mid, s); env->DeleteLocalRef(s);
         line.clear();
@@ -28,7 +28,7 @@ struct LineBuf : std::streambuf {
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_org_xune_ztransfer_Native_upload(JNIEnv* env, jclass, jint fd, jstring mtpz, jstring dir, jboolean verbose, jobject cb) {
+Java_io_github_kkffiirr_zuneandroid_Native_upload(JNIEnv* env, jclass, jint fd, jstring mtpz, jstring dir, jboolean verbose, jobject cb) {
     const char* m = env->GetStringUTFChars(mtpz, nullptr);
     const char* d = env->GetStringUTFChars(dir, nullptr);
     LineBuf buf(env, cb);

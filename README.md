@@ -1,14 +1,18 @@
-# Android2Zune (ZTransfer)
+# Zune Android
 
 **Send music from an Android phone to a Microsoft Zune over a USB OTG cable.**
 
-ZTransfer is a small Android app that talks to a Zune the way the Zune desktop software does (MTP with MTPZ
+Zune Android is a small Android app that talks to a Zune the way the Zune desktop software does (MTP with MTPZ
 authentication) and uploads tracks, albums, artwork and folders, with no PC involved. It is a thin Android layer
 (Kotlin UI + JNI) on top of [XuneSyncLibrary](https://github.com/xune-software/XuneSyncLibrary), with small patches
 that let libusb work through Android's USB permission system.
 
 The interface follows the look of the Zune desktop software: white canvas, large thin lowercase title,
 bold-caps list headings, and the pink-to-orange accent.
+
+> **Not the Xune app.** [Xune](https://github.com/xune-software) is a separate project by a different team. Zune Android
+> is an independent app that only reuses their open-source library, [XuneSyncLibrary](https://github.com/xune-software/XuneSyncLibrary).
+> Please do not report problems with this app to them.
 
 ## Status
 
@@ -32,7 +36,7 @@ Early test build. Honest summary of what has and has not been verified:
 
 ## Download
 
-The latest APK is in [`releases/`](releases/) (`ZTransfer-0.5-arm64.apk`, arm64 phones, Android 7+). It is a debug-signed
+The latest APK is in [`releases/`](releases/) (`ZuneAndroid-0.6-arm64.apk`, arm64 phones, Android 7+). It is a debug-signed
 test build: allow installs from your browser or file manager, and expect a "unknown developer" warning.
 
 ## MTPZ credentials (one-time setup)
@@ -66,7 +70,7 @@ sources at pinned commits, and two small patches in `patches/`.
 
 Other pieces in this repo:
 
-- `native/CMakeLists.txt` builds AFTL, libusb, the XuneSyncLibrary core and the JNI library `libxune_sync.so`.
+- `native/CMakeLists.txt` builds AFTL, libusb, the XuneSyncLibrary core and the JNI library `libzuneandroid.so`.
 - `native/upload_runner.cpp` is derived from the upstream `tools/upload_test_cli.cpp` (the author's capture-verified
   upload sequence), changed to connect through an Android fd and to skip its interactive research tail.
 - `native/shim/curl/curl.h` stubs out libcurl, which upstream uses only for proxying artist images.
@@ -92,12 +96,13 @@ Requirements: Android SDK with NDK `26.3.11579264`, CMake `3.22.1`, JDK 17+, Gra
 3. Build TagLib for each ABI (static, `-DBUILD_SHARED_LIBS=OFF -DWITH_ZLIB=OFF -DBUILD_BINDINGS=OFF`, NDK toolchain)
    and install it to `taglib-install/<abi>/`.
 4. For each ABI (`arm64-v8a`, `x86_64`) configure and build `native/` with the NDK toolchain
-   (`-DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static`), strip `libxune_sync.so`, and copy it plus
+   (`-DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static`), strip `libzuneandroid.so`, and copy it plus
    OpenSSL's `libcrypto.so` into `app/src/main/jniLibs/<abi>/`.
 5. `gradle :app:assembleDebug` (add `-PphoneOnly` for an arm64-only APK, about 4.5 MB).
 
 Run it: finish the one-time setup, then *add files* or *add folder*, plug the Zune in over OTG, and tap *send to zune*.
-A self-test that needs no Zune: `adb shell am start -n org.xune.ztransfer/.MainActivity --ez selftest true`.
+A self-test that needs no Zune: `adb shell am start -n io.github.kkffiirr.zuneandroid/.MainActivity --ez selftest true`.
+App log lines are also written to logcat under the tag `ZuneAndroid`.
 
 ## Credits
 
