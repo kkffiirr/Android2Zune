@@ -21,7 +21,7 @@ bold-caps list headings, and the pink-to-orange accent.
 
 Early test build. Honest summary of what has and has not been verified:
 
-- Verified: builds for arm64 and x86_64; installs and runs on a POCO F7 (Android 16); connected to a **Zune 30**
+- Verified: builds for arm64 and x86_64; installs and runs on a Android 16 phone; connected to a **Zune 30**
   (USB ID `045e:0710`, reported as "Keel (1st Gen)") and uploaded one track with album and artwork in about 4 seconds.
 - Verified on the phone: converting a generated 44.1 kHz and a 96 kHz FLAC to MP3 (correct duration, resampled to 48 kHz,
   VBR header, ID3v2.3 tags with non-Latin characters and cover art). Real music has not been converted yet, and
