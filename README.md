@@ -10,6 +10,9 @@ that let libusb work through Android's USB permission system.
 The interface follows the look of the Zune desktop software: white canvas, large thin lowercase title,
 bold-caps list headings, and the pink-to-orange accent.
 
+> **Also in this repo:** [`organizer/`](organizer/) is **Zune Organizer**, a separate app that edits the tags, albums and genres
+> of music already on the Zune (with MusicBrainz suggestions). It shares the libraries and patches below.
+
 > **Not the Xune app.** [Xune](https://github.com/xune-software) is a separate project by a different team. Zune Android
 > is an independent app that only reuses their open-source library, [XuneSyncLibrary](https://github.com/xune-software/XuneSyncLibrary).
 > Please do not report problems with this app to them.
@@ -70,12 +73,13 @@ the key. For a private build you can also bundle a key yourself: put it at `app/
 ## How it is built
 
 The app is built from three pieces: this repository (Kotlin app, JNI bridge, CMake), the unmodified upstream
-sources at pinned commits, and two small patches in `patches/`.
+sources at pinned commits, and three small patches in `patches/`.
 
 | Upstream | Pinned commit | Patch |
 |---|---|---|
 | [xune-software/XuneSyncLibrary](https://github.com/xune-software/XuneSyncLibrary) | `c2a6eeb` | `patches/0001-xune-sync-library-android-fd-connect.patch` (adds `zune_device_connect_usb_fd`) |
 | its submodule `vendor/android-file-transfer-linux` ([magicisinthehole fork](https://github.com/magicisinthehole/android-file-transfer-linux)) | `eb36f23` | `patches/0002-aftl-libusb-android-fd-wrap.patch` (libusb over an Android USB fd; bionic `strerror_r`) |
+| same submodule | `eb36f23` | `patches/0003-aftl-libusb-bulk-timeout.patch` (20 s timeout on bulk reads/writes instead of waiting forever; needed by Zune Organizer, not yet exercised by Zune Android) |
 
 Other pieces in this repo:
 
@@ -103,7 +107,7 @@ Requirements: Android SDK with NDK `26.3.11579264`, CMake `3.22.1`, JDK 17+, Gra
                                     taglib-2.0.2/  (+ utfcpp v4.0.5 copied into 3rdparty/utfcpp)
                                     lame-3.100/    (LAME 3.100 source tarball, md5 83e260acbe4389b54fe08e0bdbf7cddb)
    ```
-2. Apply the patches: `git apply patches/0001-*.patch` in `XuneSyncLibrary/`, and `git apply patches/0002-*.patch`
+2. Apply the patches: `git apply patches/0001-*.patch` in `XuneSyncLibrary/`, and `git apply patches/0002-*.patch` then `git apply patches/0003-*.patch`
    in `XuneSyncLibrary/vendor/android-file-transfer-linux/`.
 3. Build TagLib for each ABI (static, `-DBUILD_SHARED_LIBS=OFF -DWITH_ZLIB=OFF -DBUILD_BINDINGS=OFF`, NDK toolchain)
    and install it to `taglib-install/<abi>/`.
