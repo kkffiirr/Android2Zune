@@ -49,7 +49,11 @@ private const val DIM = 0xFF9A9A9A.toInt()
 private const val LINE = 0xFFD6D6D6.toInt()
 private const val PINK = 0xFFEC008C.toInt()
 private const val ORANGE = 0xFFF7611F.toInt()
-private val AUDIO_EXT = setOf("mp3", "wma", "m4a", "flac", "aac", "ogg")
+// What the Zune plays and the upload code is built for; everything else audio-like is offered for conversion to MP3.
+private val PASS_EXT = setOf("mp3", "wma", "m4a")
+private val LOSSLESS_EXT = setOf("flac", "wav", "wv", "ape", "tta", "aif", "aiff", "alac", "dsf", "dff")
+private val AUDIO_EXT = PASS_EXT + LOSSLESS_EXT + setOf("ogg", "oga", "opus", "aac", "mka", "mpc")
+private fun extOf(name: String) = name.substringAfterLast('.', "").lowercase()
 private val TRACK_RE = Regex("""Track (\d+)/(\d+):\s*(.*)""")
 private val CONNECTED_RE = Regex("""Connected to:\s*(.*?)\s*\[""")
 
@@ -235,6 +239,7 @@ class MainActivity : Activity() {
         else if (!setupDoneMarker.exists()) showSetup()
         log("Plug the Zune in with an OTG cable.")
         if (intent.getBooleanExtra("selftest", false)) selfTest()
+        intent.getStringExtra("convertTest")?.let { convertTest(it) }
     }
 
     override fun onDestroy() { unregisterReceiver(permReceiver); super.onDestroy() }
@@ -294,7 +299,10 @@ class MainActivity : Activity() {
 
     private fun mb(bytes: Long) = if (bytes >= 1L shl 30) "%.1f GB".format(bytes / 1073741824.0) else "%d MB".format(bytes / 1048576)
 
-    private fun log(s: String) { logView.append(s + "\n"); logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) } }
+    private fun log(s: String) {
+        android.util.Log.i("ZuneAndroid", s)
+        logView.append(s + "\n"); logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
+    }
 
     // ---------- picking and staging ----------
 
@@ -359,18 +367,60 @@ class MainActivity : Activity() {
             log("Not enough free space to stage ${mb(total)} (free: ${mb(cacheDir.usableSpace)}). Pick fewer files.")
             return
         }
+        val foreign = items.filter { extOf(it.name) !in PASS_EXT }
+        if (foreign.isEmpty()) { runStaging(items, convert = false, folderMode = folderMode); return }
+        // Offer conversion for everything the Zune cannot play, naming the formats and the target.
+        val counts = foreign.groupingBy { extOf(it.name).uppercase() }.eachCount().entries.joinToString(", ") { "${it.key} ×${it.value}" }
+        setBusy(true)
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Convert for your Zune?")
+            .setMessage("${foreign.size} file(s) are not in a format your Zune plays ($counts).\n\n" +
+                "Convert them to MP3 on this phone? Lossless sources use LAME VBR V0 (about 245 kbps, near-transparent); " +
+                "lossy sources use V2 (about 190 kbps).\n\n" +
+                "WMA Lossless would be the lossless match, but no encoder for it exists on Android.")
+            .setPositiveButton("Convert") { _, _ -> runStaging(items, convert = true, folderMode = folderMode) }
+            .setNegativeButton("Skip these") { _, _ -> runStaging(items, convert = false, folderMode = folderMode) }
+            .setOnCancelListener { setBusy(false); nowText.text = ""; log("Cancelled: nothing staged.") }
+            .show()
+    }
+
+    private fun runStaging(items: List<Staged>, convert: Boolean, folderMode: Boolean) {
         setBusy(true)
         Thread {
             musicDir.mkdirs()
+            val tmpDir = File(cacheDir, "convert-tmp").apply { mkdirs() }
+            var staged = 0; var converted = 0; var skipped = 0
             items.forEachIndexed { i, s ->
-                runOnUiThread { nowText.text = "staging ${i + 1} of ${items.size}…" }
-                runCatching {
-                    contentResolver.openInputStream(s.uri)!!.use { inp -> uniqueFile(s.name).outputStream().use { inp.copyTo(it) } }
-                }.onFailure { runOnUiThread { log("Skipped ${s.name}: ${it.message}") } }
+                val ext = extOf(s.name)
+                val n = i + 1
+                if (ext in PASS_EXT) {
+                    runOnUiThread { nowText.text = "staging $n of ${items.size}…" }
+                    runCatching {
+                        contentResolver.openInputStream(s.uri)!!.use { inp -> uniqueFile(s.name).outputStream().use { inp.copyTo(it) } }
+                    }.onSuccess { staged++ }.onFailure { skipped++; runOnUiThread { log("Skipped ${s.name}: ${it.message}") } }
+                } else if (!convert) {
+                    skipped++; runOnUiThread { log("Skipped (not a Zune format): ${s.name}") }
+                } else {
+                    val tmp = File(tmpDir, "src-$n.$ext")
+                    val dst = uniqueFile(s.name.substringBeforeLast('.') + ".mp3")
+                    runOnUiThread { nowText.text = "converting $n of ${items.size}  •  ${s.name}" }
+                    val err: String? = try {
+                        contentResolver.openInputStream(s.uri)!!.use { inp -> tmp.outputStream().use { inp.copyTo(it) } }
+                        Converter.toMp3(tmp, dst, if (ext in LOSSLESS_EXT) 0 else 2) { pct ->
+                            runOnUiThread { nowText.text = "converting $n of ${items.size}  •  $pct%  •  ${s.name}" }
+                        }
+                    } catch (e: Exception) { dst.delete(); "${e.message}" }
+                    if (err == null) {
+                        val tagErr = Native.copyTags(tmp.path, dst.path)
+                        converted++
+                        runOnUiThread { log("Converted ${s.name} -> ${dst.name}" + if (tagErr.isNotEmpty()) " (tags: $tagErr)" else "") }
+                    } else { skipped++; runOnUiThread { log("Could not convert ${s.name}: $err") } }
+                    tmp.delete()
+                }
             }
             runOnUiThread {
                 setBusy(false); nowText.text = ""; refreshStatus()
-                log("Staged ${items.size} file(s)${if (folderMode) " from folder" else ""}")
+                log("Staged $staged, converted $converted, skipped $skipped file(s)${if (folderMode) " from folder" else ""}")
             }
         }.start()
     }
@@ -470,6 +520,16 @@ class MainActivity : Activity() {
         zuneActive = false; zuneState = "NOT CONNECTED"
         refreshStatus()
     }
+
+    /** adb: --es convertTest name  ->  converts cache/selftest/<name> to MP3 (+tags) and logs the result; no Zune needed. */
+    private fun convertTest(name: String) = Thread {
+        val dir = File(cacheDir, "selftest")
+        val src = File(dir, name); val dst = File(dir, name.substringBeforeLast('.') + ".mp3")
+        val t0 = System.currentTimeMillis()
+        val err = Converter.toMp3(src, dst, 0) { }
+        val tagErr = if (err == null) Native.copyTags(src.path, dst.path) else "-"
+        runOnUiThread { log("convertTest $name: " + (err ?: "OK") + " | out=${dst.length()} bytes | tags=${tagErr.ifEmpty { "ok" }} | ${System.currentTimeMillis() - t0} ms") }
+    }.start()
 
     /** adb shell am start --ez selftest true: proves the .so loads and JNI + log bridge work, no Zune needed. */
     private fun selfTest() = Thread {

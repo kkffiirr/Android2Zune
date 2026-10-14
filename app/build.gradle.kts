@@ -9,8 +9,8 @@ android {
         applicationId = "io.github.kkffiirr.zuneandroid"
         minSdk = 24
         targetSdk = 34
-        versionCode = 6
-        versionName = "0.6"
+        versionCode = 7
+        versionName = "0.7"
         // -PphoneOnly drops x86_64 (emulator-only) to shrink the APK
         ndk { abiFilters += if (project.hasProperty("phoneOnly")) listOf("arm64-v8a") else listOf("arm64-v8a", "x86_64") }
     }

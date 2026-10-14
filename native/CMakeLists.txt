@@ -53,6 +53,16 @@ set_target_properties(zuneandroid PROPERTIES CXX_VISIBILITY_PRESET hidden)
 # ---- upload runner (reference sequence from tools/upload_test_cli.cpp) + JNI ----
 add_library(tag STATIC IMPORTED)
 set_target_properties(tag PROPERTIES IMPORTED_LOCATION ${ROOT}/taglib-install/${ANDROID_ABI}/lib/libtag.a)
-target_sources(zuneandroid PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/upload_runner.cpp ${CMAKE_CURRENT_SOURCE_DIR}/jni_bridge.cpp)
+# ---- LAME 3.100 (encoder only) for converting FLAC/OGG/WAV/... to MP3 ----
+set(LAME ${ROOT}/deps/lame-3.100)
+file(GLOB LAME_SRC ${LAME}/libmp3lame/*.c)
+list(FILTER LAME_SRC EXCLUDE REGEX "mpglib_interface[.]c$")
+add_library(mp3lame STATIC ${LAME_SRC})
+target_include_directories(mp3lame PUBLIC ${LAME}/include PRIVATE ${LAME}/libmp3lame ${CMAKE_CURRENT_SOURCE_DIR}/lame_config)
+target_compile_definitions(mp3lame PRIVATE HAVE_CONFIG_H LAME_LIBRARY_BUILD STDC_HEADERS)
+target_compile_options(mp3lame PRIVATE -w)
+
+target_sources(zuneandroid PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/upload_runner.cpp ${CMAKE_CURRENT_SOURCE_DIR}/jni_bridge.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/mp3_bridge.cpp)
 target_include_directories(zuneandroid PRIVATE ${ROOT}/taglib-install/${ANDROID_ABI}/include ${XS})
-target_link_libraries(zuneandroid PRIVATE tag z ssl_crypto)
+target_link_libraries(zuneandroid PRIVATE tag mp3lame z ssl_crypto)

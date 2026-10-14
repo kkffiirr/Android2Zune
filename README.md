@@ -20,6 +20,9 @@ Early test build. Honest summary of what has and has not been verified:
 
 - Verified: builds for arm64 and x86_64; installs and runs on a POCO F7 (Android 16); connected to a **Zune 30**
   (USB ID `045e:0710`, reported as "Keel (1st Gen)") and uploaded one track with album and artwork in about 4 seconds.
+- Verified on the phone: converting a generated 44.1 kHz and a 96 kHz FLAC to MP3 (correct duration, resampled to 48 kHz,
+  VBR header, ID3v2.3 tags with non-Latin characters and cover art). Real music has not been converted yet, and
+  converted tracks have not been sent to a Zune yet.
 - Not verified: playback of the transferred track on the device after the app finished, folder transfers of many
   files, the Zune HD and other models, and long batches.
 - The Zune HD and other models are supported by the upstream library on paper, but nothing here has been tested on them.
@@ -28,7 +31,13 @@ Early test build. Honest summary of what has and has not been verified:
 
 ## Features
 
-- Pick individual audio files or a whole folder (searched recursively; MP3, WMA, M4A, FLAC, AAC, OGG).
+- Pick individual audio files or a whole folder (searched recursively).
+- **Converts what the Zune cannot play.** MP3, WMA and M4A go straight through. FLAC, Ogg Vorbis, Opus, WAV and other
+  audio files are offered for conversion to **MP3** on the phone (Android decodes, LAME encodes and resamples):
+  lossless sources use VBR V0 (about 245 kbps, near-transparent), lossy ones V2 (about 190 kbps). Tags and cover art are
+  copied. You are asked first and can skip those files. WMA Lossless would be the logical lossless target for a Zune,
+  but no WMA Lossless encoder exists for Android (FFmpeg can only decode it), so lossless sources become high-quality MP3.
+  Formats Android cannot decode (APE, WavPack, ALAC and similar) are reported and skipped.
 - Groups tracks by artist and album from their tags and sends artwork.
 - Live progress ("track N of M") and a full log tab.
 - Connects through Android's USB host permission dialog; works with an OTG adapter on a non-rooted phone.
@@ -36,7 +45,7 @@ Early test build. Honest summary of what has and has not been verified:
 
 ## Download
 
-The latest APK is in [`releases/`](releases/) (`ZuneAndroid-0.6-arm64.apk`, arm64 phones, Android 7+). It is a debug-signed
+The latest APK is in [`releases/`](releases/) (`ZuneAndroid-0.7-arm64.apk`, arm64 phones, Android 7+). It is a debug-signed
 test build: allow installs from your browser or file manager, and expect a "unknown developer" warning.
 
 ## MTPZ credentials (one-time setup)
@@ -73,6 +82,8 @@ Other pieces in this repo:
 - `native/CMakeLists.txt` builds AFTL, libusb, the XuneSyncLibrary core and the JNI library `libzuneandroid.so`.
 - `native/upload_runner.cpp` is derived from the upstream `tools/upload_test_cli.cpp` (the author's capture-verified
   upload sequence), changed to connect through an Android fd and to skip its interactive research tail.
+- `native/mp3_bridge.cpp` + `native/lame_config/config.h` build LAME's encoder into the app and copy tags (TagLib);
+  `Converter.kt` decodes with MediaExtractor/MediaCodec and feeds it.
 - `native/shim/curl/curl.h` stubs out libcurl, which upstream uses only for proxying artist images.
 - Two build gotchas worth knowing: AFTL's MTPZ code is guarded by `MTPZ_ENABLED` (not `MTPZ`), and libusb's
   `LIBUSB_OPTION_NO_DEVICE_DISCOVERY` is an enum, so it must be set with `libusb_init_context()` and not under `#ifdef`.
@@ -90,6 +101,7 @@ Requirements: Android SDK with NDK `26.3.11579264`, CMake `3.22.1`, JDK 17+, Gra
                                     openssl/  (unzip Google's prefab AAR:
                                     com.android.ndk.thirdparty:openssl:1.1.1q-beta-1)
                                     taglib-2.0.2/  (+ utfcpp v4.0.5 copied into 3rdparty/utfcpp)
+                                    lame-3.100/    (LAME 3.100 source tarball, md5 83e260acbe4389b54fe08e0bdbf7cddb)
    ```
 2. Apply the patches: `git apply patches/0001-*.patch` in `XuneSyncLibrary/`, and `git apply patches/0002-*.patch`
    in `XuneSyncLibrary/vendor/android-file-transfer-linux/`.
@@ -114,6 +126,7 @@ App log lines are also written to logcat under the tag `ZuneAndroid`.
   adds Zune and MTPZ support: the MTP/MTPZ implementation under the hood.
 - **[libusb](https://libusb.info)** (LGPL-2.1), **OpenSSL** (via Google's NDK prebuilt package) and
   **[TagLib](https://taglib.org)** (LGPL-2.1 / MPL-1.1).
+- **[LAME](https://lame.sourceforge.io)** 3.100 (LGPL-2.1): the MP3 encoder used for format conversion.
 - The **[libmtp](https://libmtp.sourceforge.net)** project, whose MTPZ work and `.mtpz-data` format the whole
   ecosystem builds on.
 - Interface styling inspired by Microsoft's Zune desktop software. The launcher icon uses the Zune logo
